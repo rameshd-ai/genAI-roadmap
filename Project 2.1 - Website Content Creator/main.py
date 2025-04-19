@@ -13,6 +13,10 @@ with open(key_path) as f:
 
 client = openai.OpenAI(api_key=key_data["openai_api_key"])
 
+# Login Credentials
+USERNAME = "admin"
+PASSWORD = "password123"
+
 # Prompt templates
 def zero_shot_prompt(content_type, business_name, business_description, tone, seo_keywords):
     seo_part = f"\nSEO Keywords: {seo_keywords}" if seo_keywords else ""
@@ -159,7 +163,7 @@ def save_docx(content):
     doc.save(filename)
     return filename
 
-# Gradio UI
+# Main App Function
 def app(content_type, business_name, business_description, tone, prompt_style, temperature, max_tokens, num_variations, seo_keywords):
     auto_title = generate_title(business_description)
     generated_content = generate_content(content_type, business_name, business_description, tone, prompt_style, temperature, max_tokens, num_variations, seo_keywords)
@@ -168,34 +172,56 @@ def app(content_type, business_name, business_description, tone, prompt_style, t
     docx_path = save_docx(full_content)
     return auto_title, full_content, txt_path, docx_path
 
+# Authenticate user
+def authenticate(username, password):
+    if username == USERNAME and password == PASSWORD:
+        return gr.update(visible=False), gr.update(visible=True), ""
+    else:
+        return gr.update(visible=True), gr.update(visible=False), "❌ Invalid credentials. Please try again."
+
+# Gradio UI
 with gr.Blocks() as demo:
-    gr.Markdown("# 🌟 Website Content Creator Tool 2.2")
-    gr.Markdown("🚀 Generate high-quality website content with auto Title, auto SEO suggestions, 📄 Docx & Text Export!")
+    gr.Markdown("# 🔒 Login to access Website Content Creator Tool")
 
-    with gr.Row():
-        content_type = gr.Dropdown(["Home Page", "About Us", "Services", "Product Description", "Blog Post"], label="Content Type", value="Home Page")
-        tone = gr.Dropdown(["Formal", "Friendly", "Professional", "Casual", "Luxury"], label="Tone", value="Friendly")
-        prompt_style = gr.Radio(["Zero-shot", "Few-shot", "Chain-of-thought"], label="Prompt Style", value="Zero-shot")
+    # Login Form
+    with gr.Group() as login_block:
+        username = gr.Textbox(label="Username", placeholder="Enter username")
+        password = gr.Textbox(label="Password", placeholder="Enter password", type="password")
+        login_btn = gr.Button("Login")
+        login_msg = gr.Label(visible=True)
 
-    business_name = gr.Textbox(label="Business Name", placeholder="e.g., Aura Creations")
-    business_description = gr.Textbox(label="Business Description", placeholder="e.g., Aura Creations offers handmade home decor and personalized gifts...")
-    seo_keywords = gr.Textbox(label="SEO Keywords (optional)", placeholder="Leave empty to auto-generate")
+    # Main App (hidden initially)
+    with gr.Group(visible=False) as main_app:
+        gr.Markdown("# 🌟 Website Content Creator Tool 2.2")
+        gr.Markdown("🚀 Generate high-quality website content with auto Title, auto SEO suggestions, 📄 Docx & Text Export!")
 
-    with gr.Row():
-        temperature = gr.Slider(minimum=0.0, maximum=1.0, value=0.7, label="Creativity (Temperature)")
-        max_tokens = gr.Slider(minimum=100, maximum=1500, value=700, label="Max Tokens (Content Length)")
-        num_variations = gr.Slider(minimum=1, maximum=5, step=1, value=1, label="Number of Variations")
+        with gr.Row():
+            content_type = gr.Dropdown(["Home Page", "About Us", "Services", "Product Description", "Blog Post"], label="Content Type", value="Home Page")
+            tone = gr.Dropdown(["Formal", "Friendly", "Professional", "Casual", "Luxury"], label="Tone", value="Friendly")
+            prompt_style = gr.Radio(["Zero-shot", "Few-shot", "Chain-of-thought"], label="Prompt Style", value="Zero-shot")
 
-    generate_button = gr.Button("✨ Generate Content")
-    title_output = gr.Textbox(label="Auto-Generated Title")
-    output = gr.Textbox(lines=20, label="Generated Content", interactive=True)
-    
-    with gr.Row():
-        download_txt_button = gr.File(label="Download as .txt")
-        download_docx_button = gr.File(label="Download as .docx")
+        business_name = gr.Textbox(label="Business Name", placeholder="e.g., Aura Creations")
+        business_description = gr.Textbox(label="Business Description", placeholder="e.g., Aura Creations offers handmade home decor and personalized gifts...")
+        seo_keywords = gr.Textbox(label="SEO Keywords (optional)", placeholder="Leave empty to auto-generate")
 
-    generate_button.click(app, 
-                           inputs=[content_type, business_name, business_description, tone, prompt_style, temperature, max_tokens, num_variations, seo_keywords],
-                           outputs=[title_output, output, download_txt_button, download_docx_button])
+        with gr.Row():
+            temperature = gr.Slider(minimum=0.0, maximum=1.0, value=0.7, label="Creativity (Temperature)")
+            max_tokens = gr.Slider(minimum=100, maximum=1500, value=700, label="Max Tokens (Content Length)")
+            num_variations = gr.Slider(minimum=1, maximum=5, step=1, value=1, label="Number of Variations")
 
-demo.launch()
+        generate_button = gr.Button("✨ Generate Content")
+        title_output = gr.Textbox(label="Auto-Generated Title")
+        output = gr.Textbox(lines=20, label="Generated Content", interactive=True)
+
+        with gr.Row():
+            download_txt_button = gr.File(label="Download as .txt")
+            download_docx_button = gr.File(label="Download as .docx")
+
+        generate_button.click(app, 
+            inputs=[content_type, business_name, business_description, tone, prompt_style, temperature, max_tokens, num_variations, seo_keywords],
+            outputs=[title_output, output, download_txt_button, download_docx_button])
+
+    # Connect login button
+    login_btn.click(authenticate, inputs=[username, password], outputs=[login_block, main_app, login_msg])
+
+demo.launch(debug=True)
