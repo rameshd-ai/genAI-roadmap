@@ -16,3 +16,14 @@ Use OpenAI chat-completion API
 Simple CLI chatbot
 
 Intro to prompt engineering
+===================================================
+
+
+Phase 1: Prompt Engineering & token management
+Goal: Learn the art and science of interacting with LLMs
+1.Prompt Engineering Deep DIve
+Zero-shot, Few Shot,Chain-of-thought
+Temprature, top_p, tokens, max_length
+2.Project 2: Smart Email Generatore
+- Take a subject and generate email copy
+- Use prompt templates and roles 
