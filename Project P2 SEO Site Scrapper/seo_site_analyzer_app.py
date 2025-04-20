@@ -239,6 +239,7 @@ if menu == "🔎 Keyword Scraper & Analyzer":
 
             st.success("Report Generated!")
 
+# ... [First Tab Code Unchanged Above]
 
 # --- SEO Site Audit Analyzer ---
 elif menu == "🛠️ SEO Site Audit Analyzer":
@@ -252,36 +253,89 @@ elif menu == "🛠️ SEO Site Audit Analyzer":
         if sitemap_url:
             with st.spinner("Fetching URLs from sitemap..."):
                 internal_links = get_urls_from_sitemap(sitemap_url)[:max_pages]
+
+            if internal_links:
+                st.info(f"Found {len(internal_links)} URLs. Starting audit...")
+
+                progress = st.progress(0)
                 all_pages_data = []
 
-                for link in internal_links:
-                    analysis = analyze_page(link)
-                    if analysis:
-                        all_pages_data.append(analysis)
+                from concurrent.futures import ThreadPoolExecutor
+
+                def safe_analyze(url):
+                    try:
+                        return analyze_page(url)
+                    except:
+                        return None
+
+                with ThreadPoolExecutor(max_workers=5) as executor:
+                    futures = {executor.submit(safe_analyze, link): link for link in internal_links}
+                    for i, future in enumerate(futures):
+                        result = future.result()
+                        if result:
+                            # --- Basic SEO Scoring ---
+                            seo_score = 100
+                            if result['Title Length'] == 0:
+                                seo_score -= 20
+                            if result['Meta Description Length'] == 0:
+                                seo_score -= 20
+                            if result['Images without Alt'] > 3:
+                                seo_score -= 10
+                            if not result['Has Schema Markup']:
+                                seo_score -= 10
+                            h1_count = result.get('H1', 0)
+                            if h1_count != 1:
+                                seo_score -= 10
+
+                            result['SEO Score'] = max(seo_score, 0)
+                            all_pages_data.append(result)
+
+                        progress.progress((i+1)/len(futures))
 
                 if all_pages_data:
                     df = pd.DataFrame(all_pages_data)
                     st.dataframe(df, use_container_width=True)
 
+                    csv_buffer = io.StringIO()
+                    df.to_csv(csv_buffer, index=False)
+
                     st.download_button(
-                        label="Download SEO Site Audit Report",
-                        data=df.to_csv(index=False).encode('utf-8'),
+                        label="📂 Download SEO Site Audit Report",
+                        data=csv_buffer.getvalue(),
                         file_name="seo_site_audit_report.csv",
                         mime="text/csv"
                     )
 
+                    # --- Visualization ---
+                    st.markdown("---")
+                    st.subheader("🌍 SEO Score Distribution")
+                    import plotly.express as px
+
+                    fig = px.histogram(df, x="SEO Score", nbins=10, title="SEO Score Distribution")
+                    st.plotly_chart(fig, use_container_width=True)
+
+                    st.subheader("📊 Schema Markup Presence")
+                    schema_chart = df['Has Schema Markup'].value_counts().reset_index()
+                    schema_chart.columns = ['Has Schema', 'Count']
+                    fig2 = px.bar(schema_chart, x='Has Schema', y='Count', title='Schema Markup Presence')
+                    st.plotly_chart(fig2, use_container_width=True)
+
                     # --- Notes Section ---
                     st.markdown("---")
                     st.subheader("📄 Full Meaning of Your Report Columns:")
-
                     st.markdown("""
                         - **Title**: The page title.
                         - **Meta Description**: The page meta description.
                         - **Heading Counts**: Number of H1 to H6 tags on the page.
                         - **Images without Alt**: Number of images without 'alt' text.
                         - **Schema Markup**: Whether the page has Schema Markup.
+                        - **SEO Score**: Simple score based on basic SEO factors (100 max).
                     """)
                 else:
-                    st.error("No pages to analyze or errors occurred while fetching page data.")
+                    st.error("No pages successfully analyzed.")
+
+            else:
+                st.error("No URLs found in sitemap.")
+
         else:
             st.warning("Please enter a valid sitemap URL to start the SEO audit.")
