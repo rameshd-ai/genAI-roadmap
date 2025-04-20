@@ -27,3 +27,14 @@ Temprature, top_p, tokens, max_length
 2.Project 2: Smart Email Generatore
 - Take a subject and generate email copy
 - Use prompt templates and roles 
+
+
+=================================================================
+Phase 2: LangChain Essentials
+Goal: Understand how to build production apps using LangChain
+1.LangChain Basics
+-Components:Chains,TOols,Agents,Memory,PromptTemplates
+2.Project3: I-powred PDF Q&A Bot
+-Upload PDF-> Chunk it-> Embed->Query Using OpenAI
+-Tools: LangChain,FAISS,PyPDF,OpenAIEmbeddings
+==================================================================
