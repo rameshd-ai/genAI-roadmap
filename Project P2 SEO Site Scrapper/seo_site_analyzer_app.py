@@ -1,0 +1,287 @@
+import streamlit as st
+import requests
+from bs4 import BeautifulSoup
+import xml.etree.ElementTree as ET
+import pandas as pd
+import re
+import io
+from urllib.parse import urljoin  # Import urljoin here
+
+# --- Streamlit Setup ---
+st.set_page_config(page_title="SEO Toolkit", layout="wide")
+
+st.title("🚀 SEO Scraper & Site Analyzer Toolkit")
+
+# --- Functions ---
+# ---- Phase 2: Keyword Scraper ----
+# --- Updated scrape_keywords function ---
+def scrape_keywords(url, max_pages=20):
+    visited_urls = set()
+    all_keywords = set()
+
+    def crawl(page_url):
+        if len(visited_urls) >= max_pages:
+            return
+        try:
+            # Skip invalid URLs like 'javascript:;', '#', 'mailto:', and 'tel:'
+            if page_url.startswith(('javascript:', 'mailto:', 'tel:', '#')):
+                return
+            
+            response = requests.get(page_url, timeout=10)
+            if response.status_code != 200:
+                return
+            visited_urls.add(page_url)
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            # Extract keywords
+            title = soup.title.string if soup.title else ""
+            if title:
+                all_keywords.update(re.findall(r'\b\w+\b', title.lower()))
+
+            metas = soup.find_all("meta", attrs={"name": "keywords"})
+            for meta in metas:
+                if meta.get("content"):
+                    all_keywords.update(re.findall(r'\b\w+\b', meta["content"].lower()))
+
+            headers = soup.find_all(re.compile('^h[1-6]$'))
+            for header in headers:
+                all_keywords.update(re.findall(r'\b\w+\b', header.get_text().lower()))
+
+            # Crawl internal links
+            links = soup.find_all("a", href=True)
+            for link in links:
+                link_url = urljoin(page_url, link['href'])  # Correct use of urljoin
+
+                # Skip invalid or non-HTTP URLs
+                if link_url.startswith(('javascript:', 'mailto:', 'tel:', '#')):
+                    continue
+
+                if link_url not in visited_urls:
+                    crawl(link_url)
+        except Exception as e:
+            st.error(f"Error scraping {page_url}: {e}")
+
+    crawl(url)
+    return all_keywords
+
+
+def compare_keywords(own_keywords, competitor_keywords):
+    only_in_own = own_keywords - competitor_keywords
+    only_in_competitor = competitor_keywords - own_keywords
+    common_keywords = own_keywords & competitor_keywords
+
+    return only_in_own, only_in_competitor, common_keywords
+
+# ---- Phase 3: SEO Site Analyzer ----
+def fetch_page(url):
+    try:
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            return response.text
+    except:
+        pass
+    return None
+
+def analyze_page(url):
+    html = fetch_page(url)
+    if not html:
+        return None
+
+    soup = BeautifulSoup(html, 'html.parser')
+
+    # Title & Meta
+    title = soup.title.string.strip() if soup.title else ""
+    meta_desc_tag = soup.find('meta', attrs={'name': 'description'})
+    meta_desc = meta_desc_tag['content'].strip() if meta_desc_tag and meta_desc_tag.get('content') else ""
+
+    # Heading Structure (Content of each H Tag)
+    heading_counts = {f'H{i}': len(soup.find_all(f'h{i}')) for i in range(1, 7)}
+    heading_contents = {f'H{i} Content': list(set([h.get_text(strip=True) for h in soup.find_all(f'h{i}')])) for i in range(1, 7)}
+
+    # Images without Alt
+    images = soup.find_all('img')
+    images_without_alt = [img.get('src') for img in images if not img.get('alt')]
+
+    # Schema Markup
+    has_schema = bool(soup.find_all('script', type='application/ld+json'))
+
+    # Combine heading counts and heading contents
+    page_data = {
+        "URL": url,
+        "Title": title,
+        "Title Length": len(title),
+        "Meta Description": meta_desc,
+        "Meta Description Length": len(meta_desc),
+        **heading_counts,
+        **heading_contents,  # Added heading content for H1 to H6
+        "Images without Alt": len(images_without_alt),
+        "Has Schema Markup": has_schema
+    }
+
+    return page_data
+
+# ---- Sitemap Parsing ---
+def get_urls_from_sitemap(sitemap_url):
+    try:
+        response = requests.get(sitemap_url, timeout=10)
+        if response.status_code != 200:
+            return []
+        
+        # Parse the XML response
+        tree = ET.ElementTree(ET.fromstring(response.text))
+        root = tree.getroot()
+
+        # Define the XML namespace
+        namespace = {'ns': 'http://www.sitemaps.org/schemas/sitemap/0.9'}
+
+        # Extract URLs from the <url> tags
+        urls = []
+        for url_elem in root.findall('ns:url', namespace):
+            loc = url_elem.find('ns:loc', namespace).text
+            if loc:
+                urls.append(loc)
+        
+        return urls
+    except Exception as e:
+        st.error(f"Error fetching or parsing sitemap: {e}")
+        return []
+
+# --- Session State ---
+if 'own_keywords' not in st.session_state:
+    st.session_state.own_keywords = set()
+if 'competitor_keywords' not in st.session_state:
+    st.session_state.competitor_keywords = set()
+if 'analysis_done' not in st.session_state:
+    st.session_state.analysis_done = False
+
+# --- Sidebar Menu ---
+st.sidebar.title("🛠️ Choose Tool")
+menu = st.sidebar.radio(
+    "Select a Tool",
+    ("🔎 Keyword Scraper & Analyzer", "🛠️ SEO Site Audit Analyzer")
+)
+
+# --- Keyword Scraper & Analyzer ---
+if menu == "🔎 Keyword Scraper & Analyzer":
+    st.subheader("🔎 Keyword Scraper & Analyzer")
+
+    own_sitemap_url = st.text_input("Enter Your Sitemap URL (Own Site, usually `https://example.com/sitemap.xml`):")
+    competitor_sitemap_url = st.text_input("Enter Competitor Sitemap URL (usually `https://example.com/sitemap.xml`):")
+
+    max_pages = st.slider("Max Pages to Crawl", min_value=5, max_value=100, value=20)
+
+    if st.button("Scrape Keywords"):
+        if own_sitemap_url and competitor_sitemap_url:
+            # Fetch URLs from both sitemaps
+            with st.spinner("Fetching URLs from both sitemaps..."):
+                own_internal_links = get_urls_from_sitemap(own_sitemap_url)[:max_pages]
+                competitor_internal_links = get_urls_from_sitemap(competitor_sitemap_url)[:max_pages]
+
+                # Initialize keyword sets
+                st.session_state.own_keywords = set()
+                st.session_state.competitor_keywords = set()
+
+                # Scrape keywords from own site URLs
+                for page_url in own_internal_links:
+                    st.write(f"Crawling own site: {page_url}")
+                    keywords = scrape_keywords(page_url, max_pages=max_pages)
+                    st.session_state.own_keywords.update(keywords)
+
+                # Scrape keywords from competitor site URLs
+                for page_url in competitor_internal_links:
+                    st.write(f"Crawling competitor site: {page_url}")
+                    keywords = scrape_keywords(page_url, max_pages=max_pages)
+                    st.session_state.competitor_keywords.update(keywords)
+
+            st.success("Scraping Completed!")
+            st.session_state.analysis_done = False
+
+        else:
+            st.warning("Please enter both Sitemap URLs to start scraping.")
+
+    if st.session_state.own_keywords and st.session_state.competitor_keywords:
+        if st.button("Generate Keyword Analysis Report"):
+            only_in_own, only_in_competitor, common_keywords = compare_keywords(
+                st.session_state.own_keywords,
+                st.session_state.competitor_keywords
+            )
+
+            report_data = {
+                "Keyword Type": [],
+                "Keyword": []
+            }
+
+            for kw in only_in_own:
+                report_data["Keyword Type"].append("Only in Own Site")
+                report_data["Keyword"].append(kw)
+            for kw in only_in_competitor:
+                report_data["Keyword Type"].append("Only in Competitor Site")
+                report_data["Keyword"].append(kw)
+            for kw in common_keywords:
+                report_data["Keyword Type"].append("Common")
+                report_data["Keyword"].append(kw)
+
+            df_report = pd.DataFrame(report_data)
+
+            st.dataframe(df_report, use_container_width=True)
+
+            buffer = io.BytesIO()
+            df_report.to_csv(buffer, index=False)
+            buffer.seek(0)
+
+            st.download_button(
+                label="Download SEO Keyword Analysis Report",
+                data=buffer,
+                file_name="seo_keyword_analysis_report.csv",
+                mime="text/csv",
+            )
+
+            st.success("Report Generated!")
+
+
+# --- SEO Site Audit Analyzer ---
+elif menu == "🛠️ SEO Site Audit Analyzer":
+    st.subheader("🛠️ SEO Site Audit Analyzer")
+
+    sitemap_url = st.text_input("Enter Sitemap URL (usually `https://example.com/sitemap.xml`):")
+
+    max_pages = st.slider("Max Pages to Audit", min_value=5, max_value=50, value=10)
+
+    if st.button("Start SEO Audit"):
+        if sitemap_url:
+            with st.spinner("Fetching URLs from sitemap..."):
+                internal_links = get_urls_from_sitemap(sitemap_url)[:max_pages]
+                all_pages_data = []
+
+                for link in internal_links:
+                    analysis = analyze_page(link)
+                    if analysis:
+                        all_pages_data.append(analysis)
+
+                if all_pages_data:
+                    df = pd.DataFrame(all_pages_data)
+                    st.dataframe(df, use_container_width=True)
+
+                    st.download_button(
+                        label="Download SEO Site Audit Report",
+                        data=df.to_csv(index=False).encode('utf-8'),
+                        file_name="seo_site_audit_report.csv",
+                        mime="text/csv"
+                    )
+
+                    # --- Notes Section ---
+                    st.markdown("---")
+                    st.subheader("📄 Full Meaning of Your Report Columns:")
+
+                    st.markdown("""
+                        - **Title**: The page title.
+                        - **Meta Description**: The page meta description.
+                        - **Heading Counts**: Number of H1 to H6 tags on the page.
+                        - **Images without Alt**: Number of images without 'alt' text.
+                        - **Schema Markup**: Whether the page has Schema Markup.
+                    """)
+                else:
+                    st.error("No pages to analyze or errors occurred while fetching page data.")
+        else:
+            st.warning("Please enter a valid sitemap URL to start the SEO audit.")
