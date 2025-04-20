@@ -274,4 +274,10 @@ This **AI PDF Q&A Bot** leverages powerful AI tools (LangChain, OpenAI, FAISS) t
 
 ---
 
-If you need further adjustments or clarifications, feel free to ask! 📚🚀
+
+
+Project Use:
+CMS code snippet guide
+SEO guidelines and knowldege base
+SEO Checklist
+
