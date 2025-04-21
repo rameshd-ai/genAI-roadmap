@@ -324,13 +324,21 @@ elif menu == "🛠️ SEO Site Audit Analyzer":
                     st.markdown("---")
                     st.subheader("📄 Full Meaning of Your Report Columns:")
                     st.markdown("""
-                        - **Title**: The page title.
-                        - **Meta Description**: The page meta description.
-                        - **Heading Counts**: Number of H1 to H6 tags on the page.
-                        - **Images without Alt**: Number of images without 'alt' text.
-                        - **Schema Markup**: Whether the page has Schema Markup.
-                        - **SEO Score**: Simple score based on basic SEO factors (100 max).
-                    """)
+                    | Field | What It Means | Example |
+                    |:------|:--------------|:--------|
+                    | **URL** | The webpage that was audited. This is the address of the page that was crawled and analyzed for SEO health. | `https://milestoneinternet.com/#modal-group-5` |
+                    | **Title Length** | Number of characters in the `<title>` tag. Ideally, titles should be between **50–60 characters** for best SEO visibility and click-through rates. | 53 (✅ Good) |
+                    | **Meta Description Length** | Number of characters in the `<meta name="description">` tag. Should ideally be **150–160 characters** for full display in search results. | 165 (⚠️ Slightly long) |
+                    | **H1** | Number of `<h1>` headings. Ideally, there should be **only one H1** to define the main topic clearly for SEO and accessibility. | 0 (❗ Problem: No H1 tag) |
+                    | **H2** | Number of `<h2>` headings. Used for structuring main sections under the H1, improving readability and SEO. | 18 |
+                    | **H3** | Number of `<h3>` headings. Used for deeper sub-sections under H2 headings. | 39 |
+                    | **H4** | Number of `<h4>` headings. Deeper level subheadings, useful for complex content structures. | 90 |
+                    | **H5** | Number of `<h5>` headings. Rarely used, but available for very detailed structures. | 0 |
+                    | **H6** | Number of `<h6>` headings. The smallest and deepest heading level in HTML documents. | 0 |
+                    | **Images without Alt** | Counts how many `<img>` tags are missing `alt=""`. Alt text is critical for accessibility (screen readers) and SEO (image indexing). Should be minimized. | 0 (✅ Good) |
+                    | **Has Schema Markup** | Indicates whether the page uses [Schema.org](https://schema.org/) structured data. Helps search engines better understand and represent your page in rich results. | TRUE (✅ Good) |
+                    """, unsafe_allow_html=True)
+
                 else:
                     st.error("No pages successfully analyzed.")
 
