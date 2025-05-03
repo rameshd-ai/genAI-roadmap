@@ -9,7 +9,7 @@ import os
 import json
 from urllib.parse import urljoin
 from concurrent.futures import ThreadPoolExecutor
-from openai import OpenAI
+import openai
 import plotly.express as px
 
 # --- Load OpenAI API Key ---
@@ -20,9 +20,7 @@ key_path = os.path.join(parent_dir, 'key.json')
 with open(key_path) as f:
     key_data = json.load(f)
 
-os.environ["OPENAI_API_KEY"] = key_data["openai_api_key"]
-
-client = OpenAI()
+openai.api_key = key_data["openai_api_key"]
 
 # --- Streamlit Setup ---
 st.set_page_config(page_title="SEO Toolkit", layout="wide")
@@ -106,7 +104,7 @@ Has Schema Markup: {page_data['Has Schema Markup']}
 Suggest improvements step-by-step.
 """
     try:
-        response = client.chat.completions.create(
+        response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "user", "content": prompt}
@@ -171,11 +169,10 @@ if menu == "🛠️ SEO Site Audit Analyzer":
 
                             result['SEO Score'] = max(seo_score, 0)
 
-                            # New: Add GPT recommendation inside row
                             if seo_score < 100:
                                 result['GPT Recommendation'] = get_gpt_recommendations(result)
                             else:
-                                result['GPT Recommendation'] = "All Good :white_check_mark:"
+                                result['GPT Recommendation'] = "All Good ✅"
 
                             all_pages_data.append(result)
 
